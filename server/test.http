@@ -1,0 +1,10 @@
+POST http://localhost:3001/api/players/register
+Content-Type: application/json
+
+{
+  "hiveUsername": "testuser",
+  "gender": "m",
+  "trait1": "audaz",
+  "trait2": "guerrero",
+  "region": "Las Tierras del Norte"
+}

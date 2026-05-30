@@ -1,0 +1,46 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Player {
+  id           Int       @id @default(autoincrement())
+  hiveUsername String    @unique @map("hive_username")
+  gender       String
+  trait1       String
+  trait2       String
+  region       String
+  energy       Int       @default(100)
+  strength     Int       @default(0)
+  magic        Int       @default(0)
+  ingenuity    Int       @default(0)
+  stealth      Int       @default(0)
+  influence    Int       @default(0)
+  level        Int       @default(1)
+  dust         Int       @default(0)
+  ink          Int       @default(0)
+  stone        Int       @default(0)
+  ash          Int       @default(0)
+  blood        Int       @default(0)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  missions     Mission[]
+
+  @@map("players")
+}
+
+model Mission {
+  id        Int      @id @default(autoincrement())
+  playerId  Int      @map("player_id")
+  type      String
+  status    String   @default("active")
+  startedAt DateTime @default(now()) @map("started_at")
+  endsAt    DateTime @map("ends_at")
+  result    String?
+  player    Player   @relation(fields: [playerId], references: [id])
+
+  @@map("missions")
+}
