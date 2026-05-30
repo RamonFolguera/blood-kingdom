@@ -8,26 +8,32 @@ datasource db {
 }
 
 model Player {
-  id           Int       @id @default(autoincrement())
-  hiveUsername String    @unique @map("hive_username")
-  gender       String
-  trait1       String
-  trait2       String
-  region       String
-  energy       Int       @default(100)
-  strength     Int       @default(0)
-  magic        Int       @default(0)
-  ingenuity    Int       @default(0)
-  stealth      Int       @default(0)
-  influence    Int       @default(0)
-  level        Int       @default(1)
-  dust         Int       @default(0)
-  ink          Int       @default(0)
-  stone        Int       @default(0)
-  ash          Int       @default(0)
-  blood        Int       @default(0)
-  createdAt    DateTime  @default(now()) @map("created_at")
-  missions     Mission[]
+  id               Int       @id @default(autoincrement())
+  hiveUsername     String    @unique @map("hive_username")
+  gender           String
+  trait1           String
+  trait2           String
+  region           String
+  energy           Int       @default(100)
+  lastEnergyUpdate DateTime  @default(now()) @map("last_energy_update")
+  strength         Int       @default(0)
+  magic            Int       @default(0)
+  ingenuity        Int       @default(0)
+  stealth          Int       @default(0)
+  influence        Int       @default(0)
+  level            Int       @default(1)
+  xp               Int       @default(0)
+  dust             Int       @default(0)
+  ink              Int       @default(0)
+  stone            Int       @default(0)
+  ash              Int       @default(0)
+  blood            Int       @default(0)
+  wins             Int       @default(0)
+  losses           Int       @default(0)
+  leagueId         Int       @default(1) @map("league_id")
+  seasonPass       Boolean   @default(false) @map("season_pass")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  missions         Mission[]
 
   @@map("players")
 }

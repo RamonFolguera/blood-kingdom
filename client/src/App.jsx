@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react"
 import axios from "axios";
 import Dashboard from "./Dashboard";
+
 import "./index.css";
 
 const REGIONS = [
@@ -52,7 +53,9 @@ const TRAITS = [
 
 export default function App() {
   const [screen, setScreen] = useState("landing");
-  const [username, setUsername] = useState("");
+  const [username, setUsername] = useState(
+    localStorage.getItem("bk_username") || "",
+  );
   const [connected, setConnected] = useState(false);
   const [existingPlayer, setExistingPlayer] = useState(null);
   const [checkingPlayer, setCheckingPlayer] = useState(false);
@@ -64,6 +67,41 @@ export default function App() {
   const [player, setPlayer] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+
+useEffect(() => {
+  const savedUsername = localStorage.getItem('bk_username')
+  if (savedUsername) {
+    setUsername(savedUsername)
+    setConnected(true)
+    setCheckingPlayer(true)
+    axios.get(`http://localhost:3001/api/players/${savedUsername}`)
+      .then(res => {
+        setExistingPlayer(res.data)
+        setPlayer(res.data)
+        setScreen('dashboard')
+      })
+      .catch(() => {
+        setExistingPlayer(null)
+      })
+      .finally(() => {
+        setCheckingPlayer(false)
+      })
+  }
+}, [])
+
+  async function checkPlayer(hiveUsername) {
+    setCheckingPlayer(true);
+    try {
+      const res = await axios.get(
+        `http://localhost:3001/api/players/${hiveUsername}`,
+      );
+      setExistingPlayer(res.data);
+    } catch (err) {
+      setExistingPlayer(null);
+    } finally {
+      setCheckingPlayer(false);
+    }
+  }
 
   function connectHive() {
     if (!username.trim()) return;
@@ -79,6 +117,7 @@ export default function App() {
         if (response.success) {
           setConnected(true);
           setCheckingPlayer(true);
+          localStorage.setItem('bk_username', username)
           try {
             const res = await axios.get(
               `http://localhost:3001/api/players/${username}`,
