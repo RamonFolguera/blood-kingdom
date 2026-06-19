@@ -11,13 +11,7 @@ const TRAIT_BONUSES = {
 };
 
 function calcStats(player) {
-  const stats = {
-    strength: 0,
-    magic: 0,
-    ingenuity: 0,
-    stealth: 0,
-    influence: 0,
-  };
+  const stats = { strength: 0, magic: 0, ingenuity: 0, stealth: 0, influence: 0 };
   const b1 = TRAIT_BONUSES[player.trait1] || {};
   const b2 = TRAIT_BONUSES[player.trait2] || {};
   Object.keys(stats).forEach((s) => {
@@ -27,42 +21,10 @@ function calcStats(player) {
 }
 
 const MISSIONS = [
-  {
-    id: "explore",
-    label: "Explore",
-    icon: "ti-map-2",
-    days: 1,
-    energy: 20,
-    token: "DUST",
-    desc: "Venture into the unknown",
-  },
-  {
-    id: "attack",
-    label: "Attack",
-    icon: "ti-sword",
-    days: 1,
-    energy: 30,
-    token: "ASH",
-    desc: "Challenge another player",
-  },
-  {
-    id: "defend",
-    label: "Defend",
-    icon: "ti-shield",
-    days: 1,
-    energy: 10,
-    token: "STONE",
-    desc: "Fortify your position",
-  },
-  {
-    id: "investigate",
-    label: "Investigate",
-    icon: "ti-search",
-    days: 1,
-    energy: 15,
-    token: "INK",
-    desc: "Uncover hidden secrets",
-  },
+  { id: "explore", label: "Explore", icon: "ti-map-2", energy: 20, token: "DUST", desc: "Venture into the unknown" },
+  { id: "attack", label: "Attack", icon: "ti-sword", energy: 30, token: "ASH", desc: "Challenge another player" },
+  { id: "defend", label: "Defend", icon: "ti-shield", energy: 10, token: "STONE", desc: "Fortify your position" },
+  { id: "investigate", label: "Investigate", icon: "ti-search", energy: 15, token: "INK", desc: "Uncover hidden secrets" },
 ];
 
 export default function Dashboard({ player: initialPlayer }) {
@@ -74,12 +36,15 @@ export default function Dashboard({ player: initialPlayer }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [, setTick] = useState(0);
+  const [costs, setCosts] = useState(null);
+  const [upgradeMsg, setUpgradeMsg] = useState(null);
+  const [upgradingStats, setUpgradingStats] = useState({});
   const stats = calcStats(player);
-  const imgSrc =
-    player.gender === "m" ? "/images/male_base.jpg" : "/images/female_base.jpg";
+  const imgSrc = player.gender === "m" ? "/images/male_base.jpg" : "/images/female_base.jpg";
 
   useEffect(() => {
     fetchActiveMission();
+    fetchCosts();
     const missionInterval = setInterval(fetchActiveMission, 30000);
     const tickInterval = setInterval(() => setTick((t) => t + 1), 1000);
     return () => {
@@ -90,19 +55,24 @@ export default function Dashboard({ player: initialPlayer }) {
 
   async function fetchActiveMission() {
     try {
-      const res = await axios.get(
-        `http://localhost:3001/api/missions/active/${player.hiveUsername}`,
-      );
+      const res = await axios.get(`http://localhost:3001/api/missions/active/${player.hiveUsername}`);
       setActiveMission(res.data.mission);
     } catch (err) {
       console.error(err);
     }
   }
 
+  async function fetchCosts() {
+    try {
+      const res = await axios.get(`http://localhost:3001/api/stats/costs/${player.hiveUsername}`);
+      setCosts(res.data.costs);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
   async function refreshPlayer() {
-    const res = await axios.get(
-      `http://localhost:3001/api/players/${player.hiveUsername}`,
-    );
+    const res = await axios.get(`http://localhost:3001/api/players/${player.hiveUsername}`);
     setPlayer(res.data);
   }
 
@@ -130,16 +100,14 @@ export default function Dashboard({ player: initialPlayer }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await axios.post(
-        "http://localhost:3001/api/missions/complete",
-        {
-          hiveUsername: player.hiveUsername,
-          missionId: activeMission.id,
-        },
-      );
+      const res = await axios.post("http://localhost:3001/api/missions/complete", {
+        hiveUsername: player.hiveUsername,
+        missionId: activeMission.id,
+      });
       setEvent(res.data);
       setActiveMission(null);
       await refreshPlayer();
+      await fetchCosts();
     } catch (err) {
       setError(err.response?.data?.error || "Error completing mission");
     } finally {
@@ -164,6 +132,25 @@ export default function Dashboard({ player: initialPlayer }) {
     }
   }
 
+  async function upgradeStat(stat) {
+    setUpgradingStats((prev) => ({ ...prev, [stat]: true }));
+    try {
+      const res = await axios.post("http://localhost:3001/api/stats/upgrade", {
+        hiveUsername: player.hiveUsername,
+        stat,
+      });
+      setPlayer(res.data.player);
+      await fetchCosts();
+      setUpgradeMsg({ type: "success", text: `+1 ${stat.charAt(0).toUpperCase() + stat.slice(1)}!` });
+      setTimeout(() => setUpgradeMsg(null), 2000);
+    } catch (err) {
+      setUpgradeMsg({ type: "error", text: err.response?.data?.error || "Error upgrading" });
+      setTimeout(() => setUpgradeMsg(null), 3000);
+    } finally {
+      setUpgradingStats((prev) => ({ ...prev, [stat]: false }));
+    }
+  }
+
   function timeLeft(endsAt) {
     const diff = new Date(endsAt) - new Date();
     if (diff <= 0) return "Ready to complete";
@@ -182,10 +169,6 @@ export default function Dashboard({ player: initialPlayer }) {
   return (
     <div className="db-wrap">
       <div className="bk-bg-pattern" />
-      <div className="bk-corner tl" />
-      <div className="bk-corner tr" />
-      <div className="bk-corner bl" />
-      <div className="bk-corner br" />
 
       <div className="db-topbar">
         <div className="db-top-left">
@@ -198,10 +181,7 @@ export default function Dashboard({ player: initialPlayer }) {
         <div className="db-top-right">
           <span className="db-energy-label">Energy</span>
           <div className="db-energy-bar">
-            <div
-              className="db-energy-fill"
-              style={{ width: `${player.energy}%` }}
-            />
+            <div className="db-energy-fill" style={{ width: `${player.energy}%` }} />
           </div>
           <span className="db-energy-val">{player.energy}/100</span>
         </div>
@@ -210,25 +190,44 @@ export default function Dashboard({ player: initialPlayer }) {
       <div className="db-event">
         <span className="db-event-label">Today's event</span>
         <span className="db-event-text">
-          The arcane storms of Valdris grow stronger. Explorers report strange
-          ruins emerging from the eastern fog.
+          The arcane storms of Valdris grow stronger. Explorers report strange ruins emerging from the eastern fog.
         </span>
       </div>
 
       <div className="db-main">
-        <div className="db-stats">
+
+        <div className="db-stats-panel">
+          {upgradeMsg && (
+            <div className={`stat-upgrade-msg ${upgradeMsg.type}`}>
+              {upgradeMsg.text}
+            </div>
+          )}
           {Object.entries(stats).map(([key, val]) => (
-            <div className="db-stat" key={key}>
-              <div className="db-stat-bar-wrap">
-                <div
-                  className="db-stat-bar"
-                  style={{ height: `${Math.min(val * 8, 100)}%` }}
-                />
+            <div className="db-stat-row" key={key}>
+              <div className="db-stat">
+                <div className="db-stat-bar-wrap">
+                  <div className="db-stat-bar" style={{ height: `${Math.min(val * 8, 100)}%` }} />
+                </div>
+                <div className="db-stat-val">{val}</div>
+                <div className="db-stat-lbl">{key.charAt(0).toUpperCase() + key.slice(1)}</div>
               </div>
-              <div className="db-stat-val">{val}</div>
-              <div className="db-stat-lbl">
-                {key.charAt(0).toUpperCase() + key.slice(1)}
-              </div>
+              {costs && costs[key] && (
+                <div className="db-train-card">
+                  <div className="db-train-costs">
+                    {costs[key].tokens.map((t) => (
+                      <span key={t.token} className="db-train-token">{t.amount} {t.token}</span>
+                    ))}
+                    <span className="db-train-blood">{costs[key].bloodCost} BLOOD</span>
+                  </div>
+                  <button
+                    className="db-train-btn"
+                    onClick={() => upgradeStat(key)}
+                    disabled={upgradingStats[key]}
+                  >
+                    {upgradingStats[key] ? "..." : "Train"}
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -241,26 +240,11 @@ export default function Dashboard({ player: initialPlayer }) {
           <img src={imgSrc} alt="Your character" className="db-character-img" />
           <div className="db-char-glow" />
           <div className="db-tokens">
-            <div className="db-token">
-              <span className="db-token-val">{player.dust}</span>
-              <span className="db-token-lbl">DUST</span>
-            </div>
-            <div className="db-token">
-              <span className="db-token-val">{player.ink}</span>
-              <span className="db-token-lbl">INK</span>
-            </div>
-            <div className="db-token">
-              <span className="db-token-val">{player.stone}</span>
-              <span className="db-token-lbl">STONE</span>
-            </div>
-            <div className="db-token">
-              <span className="db-token-val">{player.ash}</span>
-              <span className="db-token-lbl">ASH</span>
-            </div>
-            <div className="db-token">
-              <span className="db-token-val">{player.blood}</span>
-              <span className="db-token-lbl">BLOOD</span>
-            </div>
+            <div className="db-token"><span className="db-token-val">{player.dust}</span><span className="db-token-lbl">DUST</span></div>
+            <div className="db-token"><span className="db-token-val">{player.ink}</span><span className="db-token-lbl">INK</span></div>
+            <div className="db-token"><span className="db-token-val">{player.stone}</span><span className="db-token-lbl">STONE</span></div>
+            <div className="db-token"><span className="db-token-val">{player.ash}</span><span className="db-token-lbl">ASH</span></div>
+            <div className="db-token"><span className="db-token-val">{player.blood}</span><span className="db-token-lbl">BLOOD</span></div>
           </div>
         </div>
 
@@ -268,69 +252,35 @@ export default function Dashboard({ player: initialPlayer }) {
           {activeMission ? (
             <div className="db-active-mission">
               <div className="db-active-label">Active mission</div>
-              <div className="db-active-type">
-                {activeMission.type.toUpperCase()}
-              </div>
-              <div className="db-active-time">
-                {timeLeft(activeMission.endsAt)}
-              </div>
+              <div className="db-active-type">{activeMission.type.toUpperCase()}</div>
+              <div className="db-active-time">{timeLeft(activeMission.endsAt)}</div>
               {isMissionDone(activeMission.endsAt) && (
-                <button
-                  className="bk-connect-btn"
-                  style={{ marginTop: "12px", width: "100%" }}
-                  onClick={completeMission}
-                  disabled={loading}
-                >
+                <button className="bk-connect-btn" style={{ marginTop: "12px", width: "100%" }} onClick={completeMission} disabled={loading}>
                   {loading ? "Completing..." : "Complete mission"}
                 </button>
               )}
               {!confirmRetreat ? (
-                <button
-                  className="db-cancel"
-                  style={{ marginTop: "8px", display: "block", width: "100%" }}
-                  onClick={() => setConfirmRetreat(true)}
-                >
+                <button className="db-cancel" style={{ marginTop: "8px", display: "block", width: "100%" }} onClick={() => setConfirmRetreat(true)}>
                   Retreat
                 </button>
               ) : (
                 <div style={{ marginTop: "8px" }}>
-                  <div
-                    className="db-active-time"
-                    style={{ marginBottom: "8px" }}
-                  >
-                    You will lose the energy spent. Are you sure?
-                  </div>
+                  <div className="db-active-time" style={{ marginBottom: "8px" }}>You will lose the energy spent. Are you sure?</div>
                   <div style={{ display: "flex", gap: "8px" }}>
-                    <button
-                      className="bk-connect-btn"
-                      style={{ flex: 1, padding: "8px" }}
-                      onClick={cancelMission}
-                      disabled={loading}
-                    >
+                    <button className="bk-connect-btn" style={{ flex: 1, padding: "8px" }} onClick={cancelMission} disabled={loading}>
                       {loading ? "..." : "Confirm"}
                     </button>
-                    <button
-                      className="db-cancel"
-                      onClick={() => setConfirmRetreat(false)}
-                    >
-                      Cancel
-                    </button>
+                    <button className="db-cancel" onClick={() => setConfirmRetreat(false)}>Cancel</button>
                   </div>
                 </div>
               )}
             </div>
           ) : (
             MISSIONS.map((m) => (
-              <div
-                key={m.id}
-                className={`db-mission ${selectedMission === m.id ? "selected" : ""}`}
-                onClick={() => setSelectedMission(m.id)}
-              >
+              <div key={m.id} className={`db-mission ${selectedMission === m.id ? "selected" : ""}`} onClick={() => setSelectedMission(m.id)}>
                 <i className={`ti ${m.icon}`} aria-hidden="true" />
                 <div className="db-mission-label">{m.label}</div>
-                <div className="db-mission-meta">
-                  {m.days}d · {m.energy} energy · +{m.token}
-                </div>
+                <div className="db-mission-meta">{m.energy} energy · +{m.token}</div>
               </div>
             ))
           )}
@@ -339,40 +289,20 @@ export default function Dashboard({ player: initialPlayer }) {
 
       {event && (
         <div className="db-event-notif">
-          <div className="db-event-notif-text">
-            {event.event ? event.event.desc : "Mission completed successfully!"}
-          </div>
-          <div className="db-event-notif-reward">
-            +{event.tokenGained} {event.token.toUpperCase()}
-          </div>
-          <button className="db-cancel" onClick={() => setEvent(null)}>
-            Dismiss
-          </button>
+          <div className="db-event-notif-text">{event.event ? event.event.desc : "Mission completed successfully!"}</div>
+          <div className="db-event-notif-reward">+{event.tokenGained} {event.token.toUpperCase()}</div>
+          <button className="db-cancel" onClick={() => setEvent(null)}>Dismiss</button>
         </div>
       )}
 
       {selectedMission && !activeMission && (
         <div className="db-confirm">
-          <div className="db-confirm-desc">
-            {MISSIONS.find((m) => m.id === selectedMission)?.desc}
-          </div>
+          <div className="db-confirm-desc">{MISSIONS.find((m) => m.id === selectedMission)?.desc}</div>
           {error && <div className="error">{error}</div>}
-          <button
-            className="bk-connect-btn"
-            onClick={startMission}
-            disabled={loading}
-          >
+          <button className="bk-connect-btn" onClick={startMission} disabled={loading}>
             {loading ? "Starting..." : "Begin mission"}
           </button>
-          <button
-            className="db-cancel"
-            onClick={() => {
-              setSelectedMission(null);
-              setError(null);
-            }}
-          >
-            Cancel
-          </button>
+          <button className="db-cancel" onClick={() => { setSelectedMission(null); setError(null); }}>Cancel</button>
         </div>
       )}
     </div>
